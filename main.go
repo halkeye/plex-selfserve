@@ -15,7 +15,6 @@ import (
 )
 
 type config struct {
-	Home              string `env:"HOME,required"`
 	SessionKey        string `env:"SESSION_SECRET,required"`
 	ClientID          string `env:"CLIENT_ID,required"`
 	ClientSecret      string `env:"CLIENT_SECRET,required"`
