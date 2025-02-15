@@ -15,12 +15,12 @@ import (
 )
 
 type config struct {
-	Home              string `env:"HOME"`
-	SessionKey        string `env:"SESSION_SECRET"`
-	ClientID          string `env:"CLIENT_ID"`
-	ClientSecret      string `env:"CLIENT_SECRET"`
-	ClientCallbackURL string `env:"CLIENT_CALLBACK_URL"`
-	ClientIssuerURL   string `env:"CLIENT_ISSUER_URL"`
+	Home              string `env:"HOME,required"`
+	SessionKey        string `env:"SESSION_SECRET,required"`
+	ClientID          string `env:"CLIENT_ID,required"`
+	ClientSecret      string `env:"CLIENT_SECRET,required"`
+	ClientCallbackURL string `env:"CLIENT_CALLBACK_URL,required"`
+	ClientIssuerURL   string `env:"CLIENT_ISSUER_URL,required"`
 }
 
 var cfg config
