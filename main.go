@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/sessions"
+	"github.com/joho/godotenv"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/openidConnect"
+	authentik "goauthentik.io/api/v3"
 )
 
 type config struct {
@@ -24,14 +30,26 @@ type config struct {
 var cfg config
 var store *sessions.CookieStore
 
+const sessionName = "auth"
+
+func init() {
+	err := godotenv.Load()
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+}
+
 func main() {
+	var err error
+
 	// parse
-	err := env.Parse(&cfg)
+	err = env.Parse(&cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	store = sessions.NewCookieStore([]byte(cfg.SessionKey))
+	gothic.Store = store
 
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/*")
@@ -52,6 +70,22 @@ func main() {
 }
 
 func Success(c *gin.Context) {
+	session, _ := store.Get(c.Request, sessionName)
+	user := session.Values["user"].(goth.User)
+	fmt.Print(user)
+
+	authentikCfg := authentik.NewConfiguration()
+	authentikCfg.Host = "https://auth.g4v.dev"
+
+	authentikClient := authentik.NewAPIClient(authentikCfg)
+	authCtx := context.WithValue(context.Background(), authentik.ContextAccessToken, "BEARERTOKENSTRING")
+	apps, _, err := authentikClient.AdminApi.AdminAppsListExecute(authentikClient.AdminApi.AdminAppsList(authCtx))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print(apps)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`
       <div style="
@@ -77,10 +111,22 @@ func callbackHandler(c *gin.Context) {
 	q.Add("provider", provider)
 	c.Request.URL.RawQuery = q.Encode()
 
-	_, err := gothic.CompleteUserAuth(c.Writer, c.Request)
+	user, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
+	}
+
+	session, err := store.Get(c.Request, sessionName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	user.RawData = nil
+	session.Values["user"] = user
+	err = session.Save(c.Request, c.Writer)
+	if err != nil {
+		log.Fatal("Problem Saving session data", err)
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, "/success")
