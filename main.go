@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -37,11 +36,6 @@ func main() {
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/*")
 
-	if cfg.ClientID == "" || cfg.ClientSecret == "" || cfg.ClientCallbackURL == "" {
-		log.Fatal("Environment variables (CLIENT_ID, CLIENT_SECRET, CLIENT_CALLBACK_URL) are required")
-	}
-
-	fmt.Printf("Config: %+v\n", cfg)
 	provider, err := openidConnect.New(cfg.ClientID, cfg.ClientSecret, cfg.ClientCallbackURL, cfg.ClientIssuerURL)
 	if err != nil {
 		log.Fatal(err)
@@ -76,8 +70,8 @@ func Success(c *gin.Context) {
       </div>
   `))
 }
-func callbackHandler(c *gin.Context) {
 
+func callbackHandler(c *gin.Context) {
 	provider := c.Param("provider")
 	q := c.Request.URL.Query()
 	q.Add("provider", provider)
@@ -91,8 +85,8 @@ func callbackHandler(c *gin.Context) {
 
 	c.Redirect(http.StatusTemporaryRedirect, "/success")
 }
-func signInWithProvider(c *gin.Context) {
 
+func signInWithProvider(c *gin.Context) {
 	provider := c.Param("provider")
 	q := c.Request.URL.Query()
 	q.Add("provider", provider)
