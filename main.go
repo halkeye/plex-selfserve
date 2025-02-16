@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -35,7 +34,7 @@ const sessionName = "auth"
 func init() {
 	err := godotenv.Load()
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Panicf("Error loading .env file: %v", err)
 	}
 }
 
@@ -45,7 +44,7 @@ func main() {
 	// parse
 	err = env.Parse(&cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	store = sessions.NewCookieStore([]byte(cfg.SessionKey))
@@ -56,7 +55,7 @@ func main() {
 
 	provider, err := openidConnect.New(cfg.ClientID, cfg.ClientSecret, cfg.ClientCallbackURL, cfg.ClientIssuerURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	goth.UseProviders(provider)
 
@@ -70,19 +69,24 @@ func main() {
 }
 
 func Success(c *gin.Context) {
-	session, _ := store.Get(c.Request, sessionName)
-	user := session.Values["user"].(goth.User)
-	fmt.Print(user)
+	session, err := store.Get(c.Request, sessionName)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// user := session.Values["user"].(goth.User)
+	// fmt.Print(user)
 
 	authentikCfg := authentik.NewConfiguration()
-	authentikCfg.Host = "https://auth.g4v.dev"
+	authentikCfg.Host = "auth.g4v.dev"
+	authentikCfg.Scheme = "https"
 
 	authentikClient := authentik.NewAPIClient(authentikCfg)
-	authCtx := context.WithValue(context.Background(), authentik.ContextAccessToken, "BEARERTOKENSTRING")
+	authCtx := context.WithValue(context.Background(), authentik.ContextAccessToken, session.Values["accessToken"])
 	apps, _, err := authentikClient.AdminApi.AdminAppsListExecute(authentikClient.AdminApi.AdminAppsList(authCtx))
 
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	log.Print(apps)
@@ -119,14 +123,14 @@ func callbackHandler(c *gin.Context) {
 
 	session, err := store.Get(c.Request, sessionName)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
-	user.RawData = nil
-	session.Values["user"] = user
+	// session.Values["user"] = user
+	session.Values["accessToken"] = user.AccessToken
 	err = session.Save(c.Request, c.Writer)
 	if err != nil {
-		log.Fatal("Problem Saving session data", err)
+		log.Panic("Problem Saving session data", err)
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, "/success")
